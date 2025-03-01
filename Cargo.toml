@@ -1,0 +1,15 @@
+[package]
+name = "pyo3-iceoryx2"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "pyo3_iceoryx2"
+crate-type = ["cdylib"]
+
+[dependencies]
+iceoryx2 = "0.5.0"
+pyo3 = { version = "0.23.5", features = [
+    'extension-module',
+    'abi3-py39'
+] }
