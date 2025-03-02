@@ -1,45 +1,38 @@
 import time
+
 from pyo3_iceoryx2 import (
-    create_subscriber, pop,
-    create_notifier, create_listener, notify, timed_wait_all
+    notify,
+    timed_wait_one
 )
 
-feed_channel = 'test_feed'
-event_channel = 'test_events'
+from common import (
+    event_channel,
+    init_subscriber,
+    receive,
+    PUB_CONNECTED,
+    SUB_CONNECTED
+)
 
-feed_config = {
-    'subscriber_max_buffer_size': 1,
-    'max_subscribers': 1,
-    'max_listeners': 1
-}
 
-subscriber_config = {}
-subscriber_config = {
-    'buffer_size': 1
-}
+# setup coms
+init_subscriber()
 
-event_serv_config = {
-    'max_notifiers': 2,
-    'max_listeners': 2
-}
+# wait until other side is up
+event = None
+while event != PUB_CONNECTED:
+    # wait for a publisher to be ready for 1000 ms
+    event = timed_wait_one(event_channel, 1000)
+    # notify sub readiness
+    notify(event_channel, SUB_CONNECTED)  # keep broadcasting event in case
 
-create_subscriber(feed_channel, feed_config, subscriber_config)
-create_notifier(event_channel, event_serv_config)
-create_listener(event_channel, event_serv_config)
+# first message is total number of messages to be streamed
+amount = int(receive().decode('utf-8'))
 
-READY = 0
-NEW_DATA = 1
-
+# finally receive
 try:
-    while True:
-        events = []
-        while NEW_DATA not in events:
-            events = timed_wait_all(event_channel, 1000)
-
-        msg = pop(feed_channel)
-        print(msg)
-
-        notify(event_channel, READY)
+    for i in range(amount):
+        msg = receive()
+        print(msg[:16])
 
 except KeyboardInterrupt:
     print("interrupted")

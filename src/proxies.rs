@@ -71,7 +71,7 @@ impl PyPublisherConfig {
     }
 
     pub fn unable_to_deliver_strategy(&self) -> PyResult<UnableToDeliverStrategy> {
-        let strat = self.unable_to_deliver_strategy.clone().unwrap_or("static".to_string());
+        let strat = self.unable_to_deliver_strategy.clone().unwrap_or("discard_sample".to_string());
         match strat.as_str() {
             "block" => Ok(UnableToDeliverStrategy::Block),
             "discard_sample" => Ok(UnableToDeliverStrategy::DiscardSample),

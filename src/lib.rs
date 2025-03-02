@@ -14,7 +14,9 @@ use crate::pubsub::{
 use crate::event:: {
     create_notifier,
     create_listener,
-    notify, timed_wait_all
+    notify,
+    timed_wait_one,
+    timed_wait_all
 };
 
 
@@ -28,6 +30,7 @@ fn pyo3_iceoryx2(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(create_notifier, m)?)?;
     m.add_function(wrap_pyfunction!(create_listener, m)?)?;
     m.add_function(wrap_pyfunction!(notify, m)?)?;
+    m.add_function(wrap_pyfunction!(timed_wait_one, m)?)?;
     m.add_function(wrap_pyfunction!(timed_wait_all, m)?)?;
     Ok(())
 }

@@ -1,49 +1,52 @@
 import time
+import os
+import random
+
 from pyo3_iceoryx2 import (
-    create_publisher, push,
-    create_notifier, create_listener, notify, timed_wait_all
+    notify,
+    timed_wait_one
 )
 
-feed_channel = 'test_feed'
-event_channel = 'test_events'
+from common import (
+    event_channel,
+    init_publisher,
+    send,
+    generate_random_messages,
+    PUB_CONNECTED,
+    SUB_CONNECTED
 
-feed_config = {
-    'subscriber_max_buffer_size': 1,
-    'max_subscribers': 1,
-    'max_listeners': 1
-}
+)
 
-publisher_config = {
-    'initial_max_slice_len': 512,
-    'unable_to_deliver_strategy': 'block'
-}
 
-event_serv_config = {
-    'max_notifiers': 2,
-    'max_listeners': 2
-}
+# setup comms
+init_publisher()
 
-create_publisher(feed_channel, feed_config, publisher_config)
-create_notifier(event_channel, event_serv_config)
-create_listener(event_channel, event_serv_config)
+# wait until other side is up
+event = None
+while event != SUB_CONNECTED:
+    # wait for a subscriber to be ready for 1000 ms
+    event = timed_wait_one(event_channel, 1000)
+    # notify sub about publisher readiness
+    notify(event_channel, PUB_CONNECTED)  # keep broadcasting event in case
 
-READY = 0
-NEW_DATA = 1
-
+# send total msg amount encoded as string as first msg
 amount = 100_000
+send(str(amount).encode('utf-8'))
 
+# generate {amount} msgs of len random(256b, 20kb)
+messages = generate_random_messages(
+    amount, min_msg_len=256, max_msg_len=20 * 1024)
+
+# send messages
 start_time = time.time()
 try:
-    for i in range(amount):
-       push(feed_channel, f'iteration {i}'.encode('utf-8'))
-       notify(event_channel, NEW_DATA)
-       events = []
-       while READY not in events:
-           events = timed_wait_all(event_channel, 1000)
+    for msg in messages:
+        send(msg)
 
 except KeyboardInterrupt:
     print("interrupted")
 
+# calculate runtime stats
 end_time = time.time()
 
 elapsed = end_time - start_time

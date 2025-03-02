@@ -113,7 +113,6 @@ pub fn create_subscriber(
 ) -> PyResult<()> {
     let service_config = service_config.unwrap_or_default();
     let subscriber_config = subscriber_config.unwrap_or_default();
-    println!("{:#?}\n{:#?}", service_config, subscriber_config);
     let mut subscribers = SUBSCRIBERS.lock()
         .map_err(|e|
             PyOSError::new_err(

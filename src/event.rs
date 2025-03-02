@@ -131,6 +131,28 @@ pub fn create_listener(
 }
 
 #[pyfunction]
+pub fn timed_wait_one(
+    name: &str,
+    timeout: u64,
+) -> PyResult<Option<usize>> {
+    let listeners = LISTENERS.lock()
+        .map_err(|e| PyOSError::new_err(
+            format!("Failed to lock LISTENERS mutex: {}", e)))?;
+
+    let listener = unwrap_or_pyerr(
+        listeners.get(&name.to_string()),
+        PyKeyError::new_err(format!("Listener not found {}", name)),
+    )?;
+
+    let event = listener.0.timed_wait_one(Duration::from_millis(timeout))
+        .map_err(|e| PyOSError::new_err(
+            format!("Timed wait all event failed: {}", e)))?
+        .map(|event| event.as_value());
+
+    Ok(event)
+}
+
+#[pyfunction]
 pub fn timed_wait_all(
     name: &str,
     timeout: u64,
