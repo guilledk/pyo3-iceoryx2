@@ -3,10 +3,11 @@ use std::sync::{LazyLock, Mutex};
 use iceoryx2::port::publisher::Publisher;
 use iceoryx2::port::subscriber::Subscriber;
 use iceoryx2::prelude::ipc::Service;
-use iceoryx2::prelude::{Node, NodeBuilder, ServiceName};
+use iceoryx2::prelude::{AttributeVerifier, Node, NodeBuilder, ServiceName};
 use iceoryx2::service::port_factory::publish_subscribe::PortFactory;
 use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};
 use pyo3::prelude::*;
+use crate::proxies::{PyPublisherConfig, PyServiceConfig, PySubscriberConfig};
 use crate::utils::unwrap_or_pyerr;
 
 pub struct SafePublisher(Publisher<Service, [u8], ()>);
@@ -25,22 +26,27 @@ pub static SUBSCRIBERS: LazyLock<Mutex<HashMap<String, SafeSubscriber>>> = LazyL
     Mutex::new(HashMap::new())
 });
 
-fn open_or_create_service(name: &str, node: &Node<Service>) -> PyResult<PortFactory<Service, [u8], ()>> {
+fn open_or_create_service(name: &str, node: &Node<Service>, spec: &AttributeVerifier) -> PyResult<PortFactory<Service, [u8], ()>> {
     Ok(node
         .service_builder(
             &ServiceName::new(name).map_err(|e| PyOSError::new_err(
                 format!("Could not instantiate service name {}: {}", name, e)))?)
         .publish_subscribe::<[u8]>()
-        .open_or_create()
+        .open_or_create_with_attributes(spec)
         .map_err(|e| PyOSError::new_err(
             format!("Failed to open service: {}", e)))?)
 }
 
-
 #[pyfunction]
+#[pyo3(signature = (name, service_config=None, publisher_config=None))]
 pub fn create_publisher(
     name: &str,
+    service_config: Option<PyServiceConfig>,
+    publisher_config: Option<PyPublisherConfig>,
 ) -> PyResult<()> {
+    let service_config = service_config.unwrap_or_default();
+    let publisher_config = publisher_config.unwrap_or_default();
+
     let mut publishers = PUBLISHERS.lock()
         .map_err(|e|
             PyOSError::new_err(
@@ -55,11 +61,14 @@ pub fn create_publisher(
         .map_err(|e| PyOSError::new_err(
             format!("Failed to create node: {}", e)))?;
 
-    let service = open_or_create_service(name, &node)?;
+    let service = open_or_create_service(name, &node, &service_config.into())?;
 
     let publisher = service
         .publisher_builder()
-        .initial_max_slice_len(512)
+        .initial_max_slice_len(publisher_config.initial_max_slice_len())
+        .allocation_strategy(publisher_config.allocation_strategy()?)
+        .unable_to_deliver_strategy(publisher_config.unable_to_deliver_strategy()?)
+        .max_loaned_samples(publisher_config.max_loaned_samples())
         .create()
         .map_err(|e| PyOSError::new_err(
             format!("Failed to create publisher: {}", e)))?;
@@ -68,6 +77,7 @@ pub fn create_publisher(
 
     Ok(())
 }
+
 
 #[pyfunction]
 pub fn push(
@@ -95,9 +105,15 @@ pub fn push(
 }
 
 #[pyfunction]
+#[pyo3(signature = (name, service_config=None, subscriber_config=None))]
 pub fn create_subscriber(
     name: &str,
+    service_config: Option<PyServiceConfig>,
+    subscriber_config: Option<PySubscriberConfig>,
 ) -> PyResult<()> {
+    let service_config = service_config.unwrap_or_default();
+    let subscriber_config = subscriber_config.unwrap_or_default();
+    println!("{:#?}\n{:#?}", service_config, subscriber_config);
     let mut subscribers = SUBSCRIBERS.lock()
         .map_err(|e|
             PyOSError::new_err(
@@ -112,10 +128,11 @@ pub fn create_subscriber(
         .map_err(|e| PyOSError::new_err(
             format!("Failed to create node: {}", e)))?;
 
-    let service = open_or_create_service(name, &node)?;
+    let service = open_or_create_service(name, &node, &service_config.into())?;
 
     let subscriber = service
         .subscriber_builder()
+        .buffer_size(subscriber_config.buffer_size())
         .create()
         .map_err(|e| PyOSError::new_err(
             format!("Failed to create subscriber: {}", e)))?;

@@ -5,12 +5,27 @@ from pyo3_iceoryx2 import (
 )
 
 feed_channel = 'test_feed'
-in_event_channel = 'test_events_0'
-out_event_channel = 'test_events_1'
+event_channel = 'test_events'
 
-create_subscriber(feed_channel)
-create_notifier(out_event_channel)
-create_listener(in_event_channel)
+feed_config = {
+    'subscriber_max_buffer_size': 1,
+    'max_subscribers': 1,
+    'max_listeners': 1
+}
+
+subscriber_config = {}
+subscriber_config = {
+    'buffer_size': 1
+}
+
+event_serv_config = {
+    'max_notifiers': 2,
+    'max_listeners': 2
+}
+
+create_subscriber(feed_channel, feed_config, subscriber_config)
+create_notifier(event_channel, event_serv_config)
+create_listener(event_channel, event_serv_config)
 
 READY = 0
 NEW_DATA = 1
@@ -19,12 +34,12 @@ try:
     while True:
         events = []
         while NEW_DATA not in events:
-            events = timed_wait_all(in_event_channel, 1000)
+            events = timed_wait_all(event_channel, 1000)
 
         msg = pop(feed_channel)
         print(msg)
 
-        notify(out_event_channel, READY)
+        notify(event_channel, READY)
 
 except KeyboardInterrupt:
     print("interrupted")

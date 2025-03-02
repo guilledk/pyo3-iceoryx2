@@ -1,6 +1,7 @@
 pub mod utils;
 pub mod pubsub;
 pub mod event;
+pub mod proxies;
 
 use pyo3::prelude::*;
 

@@ -5,12 +5,27 @@ from pyo3_iceoryx2 import (
 )
 
 feed_channel = 'test_feed'
-in_event_channel = 'test_events_0'
-out_event_channel = 'test_events_1'
+event_channel = 'test_events'
 
-create_publisher(feed_channel)
-create_notifier(in_event_channel)
-create_listener(out_event_channel)
+feed_config = {
+    'subscriber_max_buffer_size': 1,
+    'max_subscribers': 1,
+    'max_listeners': 1
+}
+
+publisher_config = {
+    'initial_max_slice_len': 512,
+    'unable_to_deliver_strategy': 'block'
+}
+
+event_serv_config = {
+    'max_notifiers': 2,
+    'max_listeners': 2
+}
+
+create_publisher(feed_channel, feed_config, publisher_config)
+create_notifier(event_channel, event_serv_config)
+create_listener(event_channel, event_serv_config)
 
 READY = 0
 NEW_DATA = 1
@@ -21,10 +36,10 @@ start_time = time.time()
 try:
     for i in range(amount):
        push(feed_channel, f'iteration {i}'.encode('utf-8'))
-       notify(in_event_channel, NEW_DATA)
+       notify(event_channel, NEW_DATA)
        events = []
        while READY not in events:
-           events = timed_wait_all(out_event_channel, 1000)
+           events = timed_wait_all(event_channel, 1000)
 
 except KeyboardInterrupt:
     print("interrupted")

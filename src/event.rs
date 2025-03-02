@@ -5,10 +5,11 @@ use iceoryx2::node::{Node, NodeBuilder};
 use iceoryx2::port::listener::Listener;
 use iceoryx2::port::notifier::Notifier;
 use iceoryx2::prelude::ipc::Service;
-use iceoryx2::prelude::{CallbackProgression, EventId, ServiceName, WaitSetAttachmentId, WaitSetBuilder};
+use iceoryx2::prelude::{AttributeVerifier, EventId, ServiceName};
 use iceoryx2::service::port_factory::event::PortFactory;
 use pyo3::{pyfunction, PyResult};
 use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};
+use crate::proxies::PyServiceConfig;
 use crate::utils::unwrap_or_pyerr;
 
 struct SafeNotifier(Notifier<Service>);
@@ -28,22 +29,25 @@ static LISTENERS: LazyLock<Mutex<HashMap<String, SafeListener>>> = LazyLock::new
     Mutex::new(HashMap::new())
 });
 
-fn open_or_create_service(name: &str, node: &Node<Service>) -> PyResult<PortFactory<Service>> {
+fn open_or_create_service(name: &str, node: &Node<Service>, spec: &AttributeVerifier) -> PyResult<PortFactory<Service>> {
     Ok(node
         .service_builder(
             &ServiceName::new(name).map_err(|e| PyOSError::new_err(
                 format!("Could not instantiate service name {}: {}", name, e)))?)
         .event()
-        .open_or_create()
+        .open_or_create_with_attributes(spec)
         .map_err(|e| PyOSError::new_err(
             format!("Could not open event service {}: {}", name, e)))?)
 }
 
 
 #[pyfunction]
+#[pyo3(signature = (name, service_config=None))]
 pub fn create_notifier(
     name: &str,
+    service_config: Option<PyServiceConfig>,
 ) -> PyResult<()> {
+    let service_config = service_config.unwrap_or_default();
     let mut notifiers = NOTIFIERS.lock()
         .map_err(|e|
             PyOSError::new_err(
@@ -58,7 +62,7 @@ pub fn create_notifier(
         .map_err(|e| PyOSError::new_err(
             format!("Failed to create node: {}", e)))?;
 
-    let service = open_or_create_service(name, &node)?;
+    let service = open_or_create_service(name, &node, &service_config.into())?;
 
     let notifier = service
         .notifier_builder()
@@ -93,9 +97,12 @@ pub fn notify(
 }
 
 #[pyfunction]
+#[pyo3(signature = (name, service_config=None))]
 pub fn create_listener(
     name: &str,
+    service_config: Option<PyServiceConfig>,
 ) -> PyResult<()> {
+    let service_config = service_config.unwrap_or_default();
     let mut listeners = LISTENERS.lock()
         .map_err(|e|
             PyOSError::new_err(
@@ -110,7 +117,7 @@ pub fn create_listener(
         .map_err(|e| PyOSError::new_err(
             format!("Failed to create node: {}", e)))?;
 
-    let service = open_or_create_service(name, &node)?;
+    let service = open_or_create_service(name, &node, &service_config.into())?;
 
     let listener = service
         .listener_builder()
