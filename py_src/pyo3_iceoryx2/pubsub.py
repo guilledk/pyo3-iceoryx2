@@ -1,14 +1,15 @@
 from pyo3_iceoryx2._lowlevel import (
-    create_publisher, push,
-    create_subscriber, pop,
-    create_notifier, create_listener, notify,
-    timed_wait_all
+    create_publisher, push, destroy_publisher,
+    create_subscriber, pop, destroy_subscriber,
+    create_notifier, notify, destroy_notifier,
+    create_listener, timed_wait_all, destroy_listener
 )
 from pyo3_iceoryx2.events import wait_event
 
 PUB_CONNECTED = 0
 SUB_CONNECTED = 1
-SUB_READY = 2
+SUB_DISCONNECTED = 2
+SUB_READY = 3
 NEW_DATA = 4
 
 _publisher_config = {
@@ -42,9 +43,6 @@ class Pub0:
             'max_listeners': max_subs + 1
         }
 
-        create_publisher(self._feed_key, self._feed_config, _publisher_config)
-        create_notifier(self._event_key, self._event_serv_config)
-        create_listener(self._event_key, self._event_serv_config)
         self._total_subs = 0
         self._wait_subs = wait_subs
 
@@ -52,13 +50,28 @@ class Pub0:
     def key(self) -> str:
         return self._key
 
+    def connect(self):
+        create_publisher(self._feed_key, self._feed_config, _publisher_config)
+        create_notifier(self._event_key, self._event_serv_config)
+        create_listener(self._event_key, self._event_serv_config)
+
+    def disconnect(self):
+        destroy_publisher(self._feed_key)
+        destroy_notifier(self._event_key)
+        destroy_listener(self._event_key)
+
     def _process_sub_events(self):
         events = []
         subs_ready = 0
         while self._total_subs < self._wait_subs or subs_ready < self._total_subs:
             events = timed_wait_all(self._event_key, 1000)
-            self._total_subs += len([e for e in events if e == SUB_CONNECTED])
-            subs_ready += sum([e for e in events if e == SUB_READY])
+            for event in events:
+                if event == SUB_CONNECTED:
+                    self._total_subs += 1
+                elif event == SUB_DISCONNECTED:
+                    self._total_subs -= 1
+                elif event == SUB_READY:
+                    subs_ready += 1
             notify(self._event_key, PUB_CONNECTED)
 
     def send(self, payload: bytes):
@@ -84,19 +97,21 @@ class Sub0:
             'max_listeners': max_subs + 1
         }
 
-        create_subscriber(self._feed_key, self._feed_config, _publisher_config)
-        create_notifier(self._event_key, self._event_serv_config)
-        create_listener(self._event_key, self._event_serv_config)
-
     @property
     def key(self) -> str:
         return self._key
 
     def subscribe(self):
-        events = []
-        while PUB_CONNECTED not in events:
-            events = timed_wait_all(self._event_key, 1000)
-            notify(self._event_key, SUB_CONNECTED)
+        create_subscriber(self._feed_key, self._feed_config, _publisher_config)
+        create_notifier(self._event_key, self._event_serv_config)
+        create_listener(self._event_key, self._event_serv_config)
+        notify(self._event_key, SUB_CONNECTED)
+
+    def unsubscribe(self):
+        notify(self._event_key, SUB_DISCONNECTED)
+        destroy_subscriber(self._feed_key)
+        destroy_notifier(self._event_key)
+        destroy_listener(self._event_key)
 
     def recv(self) -> bytes:
         notify(self._event_key, SUB_READY)

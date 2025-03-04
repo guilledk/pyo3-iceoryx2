@@ -1,19 +1,15 @@
+import argparse
 from pyo3_iceoryx2 import Pair1
 
-pair = Pair1('example-pair')
-pair.connect()
+def pair1_main(amount: int):
+    with Pair1('example-pair') as pair:
+        for i in range(amount):
+            msg = pair.recv()
+            print(msg[:16])
 
-# first message is total number of messages to be streamed
-amount = int(pair.recv().decode('utf-8'))
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("amount", type=int, help="Number of msgs to send")
+    args = parser.parse_args()
 
-# finally receive
-try:
-    for i in range(amount):
-        msg = pair.recv()
-        print(msg[:16])
-
-    pair.send(b'END')
-
-except KeyboardInterrupt:
-    print("interrupted")
-
+    pair1_main(args.amount)

@@ -1,48 +1,36 @@
 import time
-import os
-import random
+import argparse
 
 from pyo3_iceoryx2 import Pair0
-
-def generate_random_messages(amount: int, min_msg_len: int, max_msg_len: int) -> list[bytes]:
-    print(f"generating {amount} messages...")
-    messages = []
-    total_len = 0
-    for i in range(amount):
-        msg = f'iteration: {i} raw: '.encode('utf-8')
-        msg += os.urandom(random.randint(min_msg_len, max_msg_len))
-        total_len += len(msg)
-        messages.append(msg)
-
-    print(f'done, {total_len:,} bytes')
-    return messages
+from pyo3_iceoryx2._testing import generate_random_messages
 
 
-amount = 100_000
+def pair0_main(amount: int):
+    # generate random payloads of 256 to 20kb
+    messages, total_len = generate_random_messages(
+        amount, min_msg_len=256, max_msg_len=20 * 1024)
 
-# generate {amount} msgs of len random(256b, 20kb)
-messages = generate_random_messages(
-    amount, min_msg_len=256, max_msg_len=20 * 1024)
+    with Pair0('example-pair') as pair:
+        start_time = time.time()
 
-pair = Pair0('example-pair')
-pair.connect()
-pair.send(str(amount).encode('utf-8'))
+        # send messages
+        for msg in messages:
+            pair.send(msg)
 
-# send messages
-start_time = time.time()
-try:
-    for msg in messages:
-        pair.send(msg)
+        # calculate runtime stats
+        end_time = time.time()
 
-except KeyboardInterrupt:
-    print("interrupted")
+        elapsed = end_time - start_time
+        speed = int(amount / elapsed)
 
-# calculate runtime stats
-end_time = time.time()
+        print(f'elapsed {elapsed:.2f} seconds, {speed} items/sec')
 
-elapsed = end_time - start_time
-speed = int(amount / elapsed)
+    print(f'total bytes transmitted: {total_len:,}')
 
-print(f'elapsed {elapsed:.2f} seconds, {speed} items/sec')
 
-pair.recv()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("amount", type=int, help="Number of msgs to send")
+    args = parser.parse_args()
+
+    pair0_main(args.amount)
