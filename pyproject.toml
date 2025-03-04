@@ -11,3 +11,7 @@ dependencies = [
 [build-system]
 requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
+
+[tool.maturin]
+python-source = "py_src"
+module-name = "pyo3_iceoryx2._lowlevel"

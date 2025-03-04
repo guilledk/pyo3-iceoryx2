@@ -21,7 +21,8 @@ use crate::event:: {
 
 
 #[pymodule]
-fn pyo3_iceoryx2(m: &Bound<'_, PyModule>) -> PyResult<()> {
+#[pyo3(name="_lowlevel")]
+fn module_entrypoint(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(create_publisher, m)?)?;
     m.add_function(wrap_pyfunction!(create_subscriber, m)?)?;
     m.add_function(wrap_pyfunction!(push, m)?)?;
