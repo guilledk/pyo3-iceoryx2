@@ -1,33 +1,14 @@
-use std::collections::HashMap;
-use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
 use iceoryx2::node::{Node, NodeBuilder};
-use iceoryx2::port::listener::Listener;
-use iceoryx2::port::notifier::Notifier;
 use iceoryx2::prelude::ipc::Service;
 use iceoryx2::prelude::{AttributeVerifier, EventId, ServiceName};
 use iceoryx2::service::port_factory::event::PortFactory;
 use pyo3::{pyfunction, PyResult};
 use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};
+use crate::globals::{SafeNotifier, SafeListener, NOTIFIERS, LISTENERS};
 use crate::proxies::PyServiceConfig;
 use crate::utils::unwrap_or_pyerr;
 
-struct SafeNotifier(Notifier<Service>);
-unsafe impl Sync for SafeNotifier {}
-unsafe impl Send for SafeNotifier {}
-
-#[derive(Debug)]
-struct SafeListener(Listener<Service>);
-unsafe impl Sync for SafeListener {}
-unsafe impl Send for SafeListener {}
-
-static NOTIFIERS: LazyLock<Mutex<HashMap<String, SafeNotifier>>> = LazyLock::new(|| {
-    Mutex::new(HashMap::new())
-});
-
-static LISTENERS: LazyLock<Mutex<HashMap<String, SafeListener>>> = LazyLock::new(|| {
-    Mutex::new(HashMap::new())
-});
 
 fn open_or_create_service(name: &str, node: &Node<Service>, spec: &AttributeVerifier) -> PyResult<PortFactory<Service>> {
     Ok(node
@@ -73,6 +54,19 @@ pub fn create_notifier(
     notifiers.insert(name.to_string(), SafeNotifier(notifier));
 
     Ok(())
+}
+
+#[pyfunction]
+pub fn destroy_notifier(name: &str) -> PyResult<bool> {
+    let mut notifiers = NOTIFIERS.lock()
+        .map_err(|e|
+            PyOSError::new_err(
+                format!("Failed to lock NOTIFIERS mutex: {}", e)))?;
+
+    match notifiers.remove(name) {
+        None => Ok(false),
+        Some(_) => Ok(true)
+    }
 }
 
 #[pyfunction]
@@ -128,6 +122,19 @@ pub fn create_listener(
     listeners.insert(name.to_string(), SafeListener(listener));
 
     Ok(())
+}
+
+#[pyfunction]
+pub fn destroy_listener(name: &str) -> PyResult<bool> {
+    let mut listeners = LISTENERS.lock()
+        .map_err(|e|
+            PyOSError::new_err(
+                format!("Failed to lock LISTENERS mutex: {}", e)))?;
+
+    match listeners.remove(name) {
+        None => Ok(false),
+        Some(_) => Ok(true)
+    }
 }
 
 #[pyfunction]

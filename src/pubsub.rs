@@ -1,30 +1,12 @@
-use std::collections::HashMap;
-use std::sync::{LazyLock, Mutex};
-use iceoryx2::port::publisher::Publisher;
-use iceoryx2::port::subscriber::Subscriber;
 use iceoryx2::prelude::ipc::Service;
 use iceoryx2::prelude::{AttributeVerifier, Node, NodeBuilder, ServiceName};
 use iceoryx2::service::port_factory::publish_subscribe::PortFactory;
 use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};
 use pyo3::prelude::*;
+use crate::globals::{SafePublisher, SafeSubscriber, PUBLISHERS, SUBSCRIBERS};
 use crate::proxies::{PyPublisherConfig, PyServiceConfig, PySubscriberConfig};
 use crate::utils::unwrap_or_pyerr;
 
-pub struct SafePublisher(Publisher<Service, [u8], ()>);
-unsafe impl Sync for SafePublisher {}
-unsafe impl Send for SafePublisher {}
-
-pub struct SafeSubscriber(Subscriber<Service, [u8], ()>);
-unsafe impl Sync for SafeSubscriber {}
-unsafe impl Send for SafeSubscriber {}
-
-pub static PUBLISHERS: LazyLock<Mutex<HashMap<String, SafePublisher>>> = LazyLock::new(|| {
-    Mutex::new(HashMap::new())
-});
-
-pub static SUBSCRIBERS: LazyLock<Mutex<HashMap<String, SafeSubscriber>>> = LazyLock::new(|| {
-    Mutex::new(HashMap::new())
-});
 
 fn open_or_create_service(name: &str, node: &Node<Service>, spec: &AttributeVerifier) -> PyResult<PortFactory<Service, [u8], ()>> {
     Ok(node
@@ -78,6 +60,18 @@ pub fn create_publisher(
     Ok(())
 }
 
+#[pyfunction]
+pub fn destroy_publisher(name: &str) -> PyResult<bool> {
+    let mut publishers = PUBLISHERS.lock()
+        .map_err(|e|
+            PyOSError::new_err(
+                format!("Failed to lock PUBLISHERS mutex: {}", e)))?;
+
+    match publishers.remove(name) {
+        None => Ok(false),
+        Some(_) => Ok(true)
+    }
+}
 
 #[pyfunction]
 pub fn push(
@@ -139,6 +133,19 @@ pub fn create_subscriber(
     subscribers.insert(name.to_string(), SafeSubscriber(subscriber));
 
     Ok(())
+}
+
+#[pyfunction]
+pub fn destroy_subscriber(name: &str) -> PyResult<bool> {
+    let mut subscribers = SUBSCRIBERS.lock()
+        .map_err(|e|
+            PyOSError::new_err(
+                format!("Failed to lock SUBSCRIBERS mutex: {}", e)))?;
+
+    match subscribers.remove(name) {
+        None => Ok(false),
+        Some(_) => Ok(true)
+    }
 }
 
 #[pyfunction]
