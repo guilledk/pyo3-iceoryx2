@@ -8,21 +8,21 @@ from pyo3_iceoryx2 import Pub0
 def publisher_main(msg_amount: int, sub_amount: int):
 
     pub = Pub0('example-pubsub', wait_subs=sub_amount)
-    pub.connect()
+    pub.create()
 
     # send messages
-    start_time = time.time()
+    start_time = None
     try:
         for i in range(msg_amount):
             pub.send(str(i).encode('utf-8'))
+            if not start_time:
+                start_time = time.time()
 
     except KeyboardInterrupt:
         print("interrupted")
 
     # calculate runtime stats
     end_time = time.time()
-
-    pub.disconnect()
 
     elapsed = end_time - start_time
     speed = int(msg_amount / elapsed)

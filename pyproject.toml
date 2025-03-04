@@ -1,6 +1,6 @@
 [project]
 name = "pyo3-iceoryx2"
-version = "0.1.0"
+version = "0.2.0"
 description = ""
 authors = [{ name = "Guillermo Rodriguez", email = "guillermo@telos.net" }]
 requires-python = ">=3.9"

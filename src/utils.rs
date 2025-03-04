@@ -1,13 +1,3 @@
-use pyo3::PyErr;
-
-pub fn unwrap_or_pyerr<T>(val: Option<T>, err: PyErr) -> Result<T, PyErr> {
-    if val.is_none() {
-        Err(err)
-    } else {
-        Ok(val.unwrap())
-    }
-}
-
 /*
  py_struct macro requires following imports:
 
@@ -18,7 +8,7 @@ pub fn unwrap_or_pyerr<T>(val: Option<T>, err: PyErr) -> Result<T, PyErr> {
 #[macro_export]
 macro_rules! py_struct {
     ($name:ident { $($field:ident : $type:ty),* $(,)? }) => {
-        #[derive(Debug, Default)]
+        #[derive(Debug, Clone, Default)]
         pub struct $name {
             $(pub $field: $type),*
         }

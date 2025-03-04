@@ -1,9 +1,6 @@
-from pyo3_iceoryx2.events import wait_event, wait_events
 from pyo3_iceoryx2._lowlevel import (
-    create_publisher, push, destroy_publisher,
-    create_subscriber, pop, destroy_subscriber,
-    create_notifier, notify, destroy_notifier,
-    create_listener, destroy_listener
+    Publisher, Subscriber,
+    Notifier, Listener
 )
 
 
@@ -43,46 +40,53 @@ class BasePair:
         self._key = key
         self._feed_key = f'{key}-feed'
         self._event_key = f'{key}-event'
+        self._pub = Publisher(self._feed_key, _feed_config, _publisher_config)
+        self._sub = Subscriber(self._feed_key, _feed_config, _subscriber_config)
+        self._notifier = Notifier(self._event_key, _event_serv_config)
+        self._listener = Listener(self._event_key, _event_serv_config)
 
     @property
     def key(self) -> str:
         return self._key
 
     def connect(self):
-        create_publisher(self._feed_key, _feed_config, _publisher_config)
-        create_subscriber(self._feed_key, _feed_config, _subscriber_config)
-        create_notifier(self._event_key, _event_serv_config)
-        create_listener(self._event_key, _event_serv_config)
-
-        events = wait_events(
-            self._event_key,
-            (self.PEER_CONNECT_EVENT, self.PEER_DISCONNECT_EVENT),
-            call_back=lambda: notify(self._event_key, self.CONNECT_EVENT)
+        self._pub.create()
+        self._sub.create()
+        self._notifier.create()
+        self._listener.create()
+        events = self._listener.wait_events(
+            (self.PEER_CONNECT_EVENT, self.PEER_DISCONNECT_EVENT,),
+            1000,
+            lambda: self._notifier.notify(self.CONNECT_EVENT)
         )
 
         if self.PEER_DISCONNECT_EVENT in events:
             raise ValueError(f'Unexpected Pair disconnect event!')
 
     def disconnect(self):
-        wait_events(
-            self._event_key,
-            (self.PEER_DISCONNECT_EVENT,),
-            call_back=lambda: notify(self._event_key, self.DISCONNECT_EVENT)
+        self._listener.wait_event(
+            self.PEER_DISCONNECT_EVENT,
+            1000,
+            lambda: self._notifier.notify(self.DISCONNECT_EVENT)
         )
-        destroy_listener(self._event_key)
-        destroy_notifier(self._event_key)
-        destroy_subscriber(self._feed_key)
-        destroy_publisher(self._feed_key)
 
     def send(self, payload: bytes):
-        push(self._feed_key, payload)
-        notify(self._event_key, self.NEW_DATA)
-        wait_event(self._event_key, self.PEER_READY)
+        self._pub.push(payload)
+        self._notifier.notify(self.NEW_DATA)
+        self._listener.wait_event(
+            self.PEER_READY,
+            1000,
+            None
+        )
 
     def recv(self) -> bytes:
-        wait_event(self._event_key, self.PEER_NEW_DATA)
-        msg = pop(self._feed_key)
-        notify(self._event_key, self.READY)
+        self._listener.wait_event(
+            self.PEER_NEW_DATA,
+            1000,
+            None
+        )
+        msg = self._sub.pop()
+        self._notifier.notify(self.READY)
         return msg
 
     def __enter__(self):

@@ -6,7 +6,7 @@ from sub import subscriber_main
 
 
 if __name__ == '__main__':
-    msg_amount = 100_000
+    msg_amount = 10_000
     sub_amount = 2
     pub = mp.Process(target=publisher_main, args=(msg_amount, sub_amount,))
     pub.start()

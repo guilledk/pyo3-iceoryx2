@@ -6,7 +6,7 @@ from pair1 import pair1_main
 
 
 if __name__ == '__main__':
-    amount = 100_000
+    amount = 10_000
 
     pair0 = mp.Process(target=pair0_main, args=(amount,))
     pair0.start()
