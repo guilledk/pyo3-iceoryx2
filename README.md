@@ -1,5 +1,12 @@
 # pyo3-iceoryx2
 
+> [!NOTE]
+> With the iceoryx2 v0.7.0 release, the upstream project officially published [Python bindings](https://eclipse-iceoryx.github.io/iceoryx2/python/main/).
+>
+> A list of examples can be found [here](https://github.com/eclipse-iceoryx/iceoryx2/tree/main/examples/python).
+
+---
+
 Python bindings to [iceoryx2](https://docs.rs/iceoryx2/latest/iceoryx2/) (from their README):
 
 """
